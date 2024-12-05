@@ -3,7 +3,9 @@ package com.kooozel.utils;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -32,5 +34,19 @@ public class FileUtils {
             log.error("Error reading file: {}", e.getMessage());
             return null;
         }
+    }
+
+    public Map<Point, Character> getGridMap(String string) {
+        Map<Point, Character> map = new HashMap<>();
+        var lines = string.split("\n");
+
+        for (int rowIndex = 0; rowIndex < lines.length; rowIndex++) {
+            var line = lines[rowIndex];
+            for (int colIndex = 0; colIndex < line.length(); colIndex++) {
+                map.put(new Point(rowIndex, colIndex), line.charAt(colIndex));
+            }
+        }
+
+        return map;
     }
 }
