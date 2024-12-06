@@ -20,7 +20,7 @@ public class Main {
     private static final MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     public static void main(String[] args) {
-        var solve = new Day05(new FileUtils());
+        var solve = new Day06(new FileUtils());
 
         Timer solveATimer = Timer.builder("day02.solveA.execution.time")
             .description("Time taken to solve part A")
