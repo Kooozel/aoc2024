@@ -1,5 +1,6 @@
 package com.kooozel;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -14,7 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 
 @RequiredArgsConstructor
 @Slf4j
-public class Day06 implements Day{
+public class Day06 implements Day {
+
     private final FileUtils fileUtils;
 
     private Map<Point, Character> parseFile(InputType inputType) {
@@ -22,38 +24,66 @@ public class Day06 implements Day{
         return fileUtils.getGridMap(fileContent);
     }
 
-
-
     @Override
     public String solveA(InputType inputType) {
         var grid = parseFile(inputType);
-        var startPosition = grid.entrySet().stream().filter(point -> point.getValue() == '^').findFirst().map(Map.Entry::getKey).orElseThrow(
-            RuntimeException::new);
+        var startPosition = grid.entrySet().stream()
+            .filter(point -> point.getValue() == '^')
+            .findFirst()
+            .map(Map.Entry::getKey)
+            .orElseThrow(RuntimeException::new);
 
-        var controlSet = getPoints(startPosition, grid);
+//        var controlSet = getPoints(startPosition, grid);
 
-        return String.valueOf(controlSet.size());
+        return "";
     }
 
-    private HashSet<Point> getPoints(Point startPosition, Map<Point, Character> grid) {
+    private boolean getPoints(Point startPosition, Map<Point, Character> grid) {
         var currentPosition = startPosition;
         var currentDirection = Direction.UP;
-        var controlSet = new HashSet<Point>();
-        controlSet.add(startPosition);
-        while (currentPosition != null) {
-            var nextPoint = currentPosition.plus(currentDirection);
-            var  c = grid.getOrDefault(nextPoint, null);
-            if (c == null) { break;}
-            if (c == '#') {
-                currentDirection = getNewDirection(currentDirection);
-                nextPoint = currentPosition.plus(currentDirection);
-            }
-            currentPosition = nextPoint;
+        var controlSet = new HashSet<Pair<Point, Direction>>();
+        controlSet.add(new Pair<>(startPosition, Direction.UP));
+        var sum = 0;
 
-            controlSet.add(currentPosition);
-            log.info(currentPosition.toString());
+        while (currentPosition != null) {
+            var result = getNextPositionAndDirection(currentPosition, currentDirection, grid);
+            currentPosition = result.newPosition;
+            currentDirection = result.newDirection;
+
+            if (currentPosition == null) {
+                break;
+            }
+
+            if (sum > grid.entrySet().size()) {
+                return true;
+            }
+            sum++;
         }
-        return controlSet;
+
+        return false;
+    }
+
+    private MovementResult getNextPositionAndDirection(
+        Point currentPosition,
+        Direction currentDirection,
+        Map<Point, Character> grid) {
+        var nextPoint = currentPosition.plus(currentDirection);
+        var c = grid.getOrDefault(nextPoint, null);
+
+        if (c == null) {
+            return new MovementResult(null, currentDirection); // End of grid
+        }
+
+        if (c == '#') {
+            currentDirection = getNewDirection(currentDirection);
+            return getNextPositionAndDirection(currentPosition, currentDirection, grid);
+        }
+
+        return new MovementResult(nextPoint, currentDirection);
+    }
+
+    private record MovementResult(Point newPosition, Direction newDirection) {
+
     }
 
     private Direction getNewDirection(Direction currentDirection) {
@@ -68,61 +98,43 @@ public class Day06 implements Day{
     @Override
     public String solveB(InputType inputType) {
         var grid = parseFile(inputType);
-        var startPosition = grid.entrySet().stream().filter(point -> point.getValue() == '^').findFirst().map(Map.Entry::getKey).orElseThrow(
-            RuntimeException::new);
+        var startPosition = grid.entrySet()
+            .stream()
+            .filter(point -> point.getValue() == '^')
+            .findFirst()
+            .map(Map.Entry::getKey)
+            .orElseThrow(RuntimeException::new);
 
-        var currentPosition = startPosition;
-        var currentDirection = Direction.UP;
-        var way = new HashSet<Pair<Point, Direction>>();
-        var obstacles = new HashSet<Point>();
-        way.add(new Pair<>(currentPosition, currentDirection));
-        while (currentPosition != null) {
-            var nextPoint = currentPosition.plus(currentDirection);
-            var  c = grid.getOrDefault(nextPoint, null);
-            if (c == null) { break;}
-            if (c == '#') {
-                log.info("Change Direction");
-                currentDirection = getNewDirection(currentDirection);
-                nextPoint = currentPosition.plus(currentDirection);
+        // Set to track positions that cause cycles
+        var cycleCausingPositions = new HashSet<Point>();
+
+        // Simulate guard's movement and try adding obstacles
+        for (var obstaclePoint : grid.keySet()) {
+            // Skip if the point is not a valid position to place an obstruction
+            if (grid.get(obstaclePoint) != '.') {
+                continue;
             }
-            currentPosition = nextPoint;
 
-            var e = new Pair<>(currentPosition, currentDirection);
-            checkGrid(grid, way, new Pair<>(currentPosition, currentDirection), obstacles);
-            way.add(e);
-            log.info(currentPosition.toString());
+            // Create a new grid with the potential obstacle
+            var newGrid = createObstacle(grid, obstaclePoint);
+
+            // Check if adding this obstacle causes a cycle
+            if (isCycle(startPosition, newGrid)) {
+                cycleCausingPositions.add(obstaclePoint);
+            }
         }
-        return String.valueOf(obstacles.size());
+
+        return String.valueOf(cycleCausingPositions.size());
     }
 
-    private void checkGrid(
-        Map<Point, Character> grid,
-        HashSet<Pair<Point, Direction>> controlSet,
-        Pair<Point, Direction> o, HashSet<Point> obstacles) {
-        var nextPosition = o.key();
-        var currentDirection = getNewDirection(o.value());
-        var microSet = new HashSet<Pair<Point, Direction>>();
-        while (nextPosition != null) {
-            nextPosition = nextPosition.plus(currentDirection);
-            var c = grid.getOrDefault(nextPosition, null);
-            if (c == null) {
-                break;
-            }
-            if (c == '#') {
-                currentDirection = getNewDirection(currentDirection);
-                nextPosition = nextPosition.plus(currentDirection);
-            }
+    private Map<Point, Character> createObstacle(Map<Point, Character> grid, Point obstaclePoint) {
+        var newGrid = new HashMap<>(grid);
+        newGrid.put(obstaclePoint, '#'); // Add the obstacle
+        return newGrid;
+    }
 
-            Pair<Point, Direction> o1 = new Pair<>(nextPosition, currentDirection);
-            if (controlSet.contains(o1)) {
-                obstacles.add(o.key().plus(o.value()));
-                break;
-            }
 
-            if (!microSet.add(o1)) {
-                obstacles.add(o1.key());
-                break;
-            }
-        }
+    private boolean isCycle(Point start, Map<Point, Character> grid) {
+        return getPoints(start, grid);
     }
 }
