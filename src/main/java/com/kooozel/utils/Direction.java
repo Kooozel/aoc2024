@@ -2,9 +2,38 @@ package com.kooozel.utils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+
+@RequiredArgsConstructor
+@Getter
 public enum Direction {
-    UP, LEFT, RIGHT, DOWN;
+    UP(new Point(-1, 0)),
+    LEFT(new Point(0, -1)),
+    RIGHT(new Point(0, 1)),
+    DOWN(new Point(1, 0)),
+    UP_LEFT(new Point(-1, -1)),
+    UP_RIGHT(new Point(-1, 1)),
+    DOWN_LEFT(new Point(1, -1)),
+    DOWN_RIGHT(new Point(1, 1));
+
+    private final Point point;
+
+    private static final Map<Point, Direction> POINT_DIRECTION_MAP;
+
+    static {
+        POINT_DIRECTION_MAP = Stream.of(Direction.values())
+            .collect(Collectors.toUnmodifiableMap(Direction::getPoint, direction -> direction));
+    }
+
+    public static Direction fromPoint(Point point) {
+        return POINT_DIRECTION_MAP.get(point);
+    }
+
 
     public static Direction from(String direction) {
         return switch (direction) {
@@ -17,29 +46,15 @@ public enum Direction {
     }
 
     public static List<Point> getAllDirections() {
-        List<Point> directions = new ArrayList<>();
-
-        directions.add(new Point(0, 1));  // RIGHT
-        directions.add(new Point(0, -1)); // LEFT
-        directions.add(new Point(1, 0));  // DOWN
-        directions.add(new Point(-1, 0)); // UP
-
-        directions.add(new Point(-1, -1)); // UP-LEFT
-        directions.add(new Point(-1, 1));  // UP-RIGHT
-        directions.add(new Point(1, -1));  // DOWN-LEFT
-        directions.add(new Point(1, 1));   // DOWN-RIGHT
-
-        return directions;
+        return Stream.of(Direction.values()).map(Direction::getPoint).toList();
     }
 
     public static List<Point> getCorners() {
-        List<Point> directions = new ArrayList<>();
-        directions.add(new Point(-1, -1)); // UP-LEFT
-        directions.add(new Point(-1, 1));  // UP-RIGHT
-        directions.add(new Point(1, -1));  // DOWN-LEFT
-        directions.add(new Point(1, 1));   // DOWN-RIGHT
+        return Stream.of(UP_RIGHT,UP_LEFT,DOWN_LEFT,DOWN_RIGHT).map(Direction::getPoint).toList();
+    }
 
-        return directions;
+    public static List<Point> getBasicDirections() {
+        return Stream.of(UP,DOWN,LEFT,RIGHT).map(Direction::getPoint).toList();
     }
 }
 
