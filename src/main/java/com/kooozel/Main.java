@@ -20,7 +20,7 @@ public class Main {
     private static final MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     public static void main(String[] args) {
-        var solve = new Day12((new FileUtils()));
+        var solve = new Day16((new FileUtils()));
 
         Timer solveATimer = Timer.builder("day02.solveA.execution.time")
             .description("Time taken to solve part A")
@@ -31,7 +31,7 @@ public class Main {
 
         try {
             log.info("Starting to solve Part A...");
-            String resultA = solveATimer.record(() -> solve.solveA(InputType.INPUT));
+            String resultA = solveATimer.record(() -> solve.solveA(InputType.TEST));
             double timeA = solveATimer.totalTime(TimeUnit.SECONDS);
             log.info("Result for Part A: {}", resultA);
             log.info("Execution time for Part A: {} seconds", timeA);
