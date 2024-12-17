@@ -1,12 +1,14 @@
 package com.kooozel;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.kooozel.utils.Direction;
 import com.kooozel.utils.FileUtils;
@@ -32,7 +34,14 @@ public class Day16 implements Day {
         var end = input.entrySet().stream().filter(e -> e.getValue() == 'E').map(Map.Entry::getKey).findFirst().get();
 
         var routes = calculateRoutes(start, input, end);
-        var sum = routes.stream().map(this::calculateRouteScore).toList();
+
+        // Get optimal paths
+        Set<List<Point>> paths = routes.getPaths();
+        System.out.println("Optimal Paths: " + paths.size());
+
+        // Get unique tiles
+        Set<Point> uniqueTiles = routes.getUniqueTiles();
+        System.out.println("Unique Tiles Count: " + uniqueTiles.size());
         return "";
     }
 
@@ -41,58 +50,119 @@ public class Day16 implements Day {
         return "";
     }
 
-    public Set<List<Point>> calculateRoutes(Point start, Map<Point, Character> grid, Point end) {
-        var queue = new LinkedList<Point>();
-        var seen = new HashSet<Point>();
-        var routePaths = new HashMap<Point, Set<List<Point>>>();
+    public record PathInfo(Point point, List<Point> path, int steps, int rotations) {}
+
+    public static class Result {
+        private final Set<List<Point>> paths;
+        private final Set<Point> uniqueTiles;
+
+        public Result(Set<List<Point>> paths, Set<Point> uniqueTiles) {
+            this.paths = paths;
+            this.uniqueTiles = uniqueTiles;
+        }
+
+        public Set<List<Point>> getPaths() {
+            return paths;
+        }
+
+        public Set<Point> getUniqueTiles() {
+            return uniqueTiles;
+        }
+    }
+
+    public Result calculateRoutes(Point start, Map<Point, Character> grid, Point end) {
+        // Queue holds paths along with their direction changes and steps
+        var queue = new LinkedList<PathInfo>();
+        var visited = new HashMap<Point, PathInfo>(); // Tracks best state (steps, rotations) for each point
+        var optimalPaths = new HashSet<List<Point>>(); // Store all valid paths to the end
+        var uniqueTiles = new HashSet<Point>(); // Tracks unique tiles part of the best paths
 
         var directions = Direction.getBasicDirections();
-        queue.add(start);
-        routePaths.put(start, new HashSet<>(Set.of(List.of(start))));
+        queue.add(new PathInfo(start, List.of(start), 0, 0)); // Initialize with the starting point
+        visited.put(start, new PathInfo(start, List.of(start), 0, 0)); // Start point has a path length of 0
+
         while (!queue.isEmpty()) {
             var current = queue.removeFirst();
+            var currentPoint = current.point;
+            var currentPath = current.path;
+            var currentSteps = current.steps;
+            var currentRotations = current.rotations;
 
-            if (current.equals(end)) {
-                return routePaths.get(end);
+            // If we've reached the end, continue tracking all valid paths
+            if (currentPoint.equals(end)) {
+                optimalPaths.add(currentPath);
+                uniqueTiles.addAll(currentPath); // Add all tiles in this path to the set
+                continue; // Continue exploring for other potential paths
             }
 
-            directions.forEach(direction -> {
-                    var newPoint = current.plus(direction);
-                    if (!grid.containsKey(newPoint)) {
-                        return;
-                    }
-                    if (grid.get(newPoint) != '#') {
-                        //add to queue
-                        if (!queue.contains(newPoint) && !seen.contains(newPoint)) {
-                            queue.add(newPoint);
-                        }
+            for (Point direction : directions) {
+                var newPoint = currentPoint.plus(direction);
 
-                        routePaths.computeIfAbsent(newPoint, k -> new HashSet<>());
-                        for (List<Point> path : routePaths.get(current)) {
-                            var newPath = new ArrayList<>(path);
-                            newPath.add(newPoint);
-                            routePaths.get(newPoint).add(newPath);
-                        }
-                    }
-                    seen.add(current);
+                // Skip invalid points or obstacles
+                if (!grid.containsKey(newPoint) || grid.get(newPoint) == '#') {
+                    continue;
                 }
 
-            );
+                // Calculate the number of rotations for this move
+                int newRotations = currentRotations;
+                if (currentPath.size() > 1) {
+                    var prevPoint = currentPath.get(currentPath.size() - 2);
+                    if (!isSameDirection(prevPoint, currentPoint, newPoint)) {
+                        newRotations++;
+                    }
+                }
+
+                var newSteps = currentSteps + 1;
+
+                // If this point has been visited with fewer steps and rotations, skip it
+                if (visited.containsKey(newPoint)) {
+                    var visitedInfo = visited.get(newPoint);
+                    if (visitedInfo.steps <= newSteps && visitedInfo.rotations <= newRotations) {
+                        continue;
+                    }
+                }
+
+                // Mark this point as visited with the current state
+                var newPath = new ArrayList<>(currentPath);
+                newPath.add(newPoint);
+                var newPathInfo = new PathInfo(newPoint, newPath, newSteps, newRotations);
+                visited.put(newPoint, newPathInfo);
+                queue.add(newPathInfo);
+            }
         }
-        return null;
+
+        // Return the optimal paths and unique tiles
+        return new Result(optimalPaths, uniqueTiles);
     }
+
+    // Helper function to check if three points are in the same direction
+    private boolean isSameDirection(Point prev, Point current, Point next) {
+        var dx1 = current.x - prev.x;
+        var dy1 = current.y - prev.y;
+        var dx2 = next.x - current.x;
+        var dy2 = next.y - current.y;
+        return dx1 == dx2 && dy1 == dy2;
+    }
+
+
+
+
 
     private Integer calculateRouteScore(List<Point> route) {
         var directionChanges = countDirectionChanges(route);
-        return route.size() + directionChanges*1000;
+        return route.size() - 1 + (directionChanges) *1000;
     }
 
     public static int countDirectionChanges(List<Point> points) {
         if (points == null || points.size() < 2) return 0;
-
-        int directionChanges = 0;
         long prevDx = points.get(1).x - points.get(0).x;
         long prevDy = points.get(1).y - points.get(0).y;
+        int directionChanges = 0;
+
+        if (Direction.fromPoint(new Point(prevDx, prevDy)) != Direction.RIGHT) {
+            directionChanges++;
+        }
+
 
         for (int i = 1; i < points.size() - 1; i++) {
             long dx = points.get(i + 1).x - points.get(i).x;
